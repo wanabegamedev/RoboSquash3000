@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class TestBallBehavior : MonoBehaviour
@@ -17,5 +18,10 @@ public class TestBallBehavior : MonoBehaviour
     void Update()
     {
         
+    }
+
+    private void OnCollisionEnter(Collision other)
+    {
+        var localVelocity = transform.InverseTransformDirection(rigid.linearVelocity);
     }
 }
