@@ -23,5 +23,8 @@ public class TestBallBehavior : MonoBehaviour
     private void OnCollisionEnter(Collision other)
     {
         var localVelocity = transform.InverseTransformDirection(rigid.linearVelocity);
+        print(localVelocity);
+        
+       // rigid.AddForce(transform.InverseTransformDirection(-rigid.linearVelocity));
     }
 }
