@@ -1,7 +1,7 @@
+using System;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
-public class TestVRInput : MonoBehaviour
+public class PlayerWallTrigger : MonoBehaviour
 {
     private GameManager manager;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -13,13 +13,17 @@ public class TestVRInput : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (OVRInput.Get(OVRInput.Button.One))
+        
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.transform.CompareTag("Ball"))
         {
-            if (!manager.gameInPlay)
-            {
-                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-            }
+            manager.turns -= 1;
             manager.RestartMatch();
+            Destroy(other.gameObject);
         }
     }
 }
+
