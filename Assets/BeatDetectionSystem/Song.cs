@@ -59,6 +59,9 @@ public class Song : MonoBehaviour
     private SongData songData;
 
     private childObjects children;
+
+    private bool songPaused = false;
+    
     
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -78,6 +81,7 @@ public class Song : MonoBehaviour
         
         GenerateDataPointList();
         DrawSongGraph();
+     
     }
 
     private void Update()
@@ -86,6 +90,7 @@ public class Song : MonoBehaviour
         songData.currentPoint = songData.points.Single(x => x.startSample <= timeSample && x.endSample > timeSample);
         children.cursor.transform.localPosition = songData.currentPoint.pointPosition;
 
+        DebugInputs();
     }
 
     private void GenerateDataPointList()
@@ -148,8 +153,8 @@ public class Song : MonoBehaviour
                 }
             }
 
-            //meterScale is to make sure the sample value is visible
-            tempData.avgSampleValue = (sum / samplesPerPoint) * meterScale;
+            //meterScale is to make sure the sample value is visible, but also clamped above 1
+            tempData.avgSampleValue = Mathf.Abs((sum / samplesPerPoint) * meterScale);
             print(tempData.avgSampleValue);
             
             //idx gives the position along the song, and sample value gives the height
@@ -187,6 +192,27 @@ public class Song : MonoBehaviour
 
         children.start.transform.localPosition = new Vector3(children.bottom.transform.localScale.x * -0.5f,
             children.bottom.transform.localScale.y, children.bottom.transform.localScale.z);
+    }
+
+
+    void DebugInputs()
+    {
+        children.cam.orthographicSize += Input.mouseScrollDelta.y * cameraZoomFactor;
+        children.cam.orthographicSize = Math.Clamp(children.cam.orthographicSize, 0, 400);
+
+        if (Input.GetKeyDown(KeyCode.P))
+        {
+            if (!songPaused)
+            {
+                songPaused = true;
+                source.Pause();
+            }
+            else
+            {
+                songPaused = false;
+                source.UnPause();
+            }
+        }
     }
     
 
