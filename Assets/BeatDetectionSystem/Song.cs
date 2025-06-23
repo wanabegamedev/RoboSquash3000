@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using System.Linq;
 using System.IO;
+using System.Text;
+using NUnit.Framework;
 using UnityEngine.Serialization;
 
 [RequireComponent(typeof(AudioSource))]
@@ -10,7 +13,7 @@ public class Song : MonoBehaviour
 {
     #region  -- Helper Functions ---
 
-    private class PointData
+    public class PointData
     {
         public int idx = -1;
         public float time = -1;
@@ -24,25 +27,88 @@ public class Song : MonoBehaviour
         public Vector3 pointPosition;
         //holds the position of where the point should be in 3D space, but without the Y axis shift
         public Vector3 pointPositionStrait;
-    }
+
+        public FlagData flags;
+        
+        public GameObject marker;
+
+        public BeatData calculatedBeat;
+
+        public string StringConvert(bool header)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+
+            if (header)
+            {
+                stringBuilder.AppendFormat("Idx".PadRight(20));
+                stringBuilder.AppendFormat("Time".PadRight(20));
+                stringBuilder.AppendFormat("Start Sample".PadRight(20));
+                stringBuilder.AppendFormat("End Sample".PadRight(20));
+                stringBuilder.AppendFormat("delta".PadRight(20));
+                stringBuilder.AppendFormat("rawBPM".PadRight(20));
+                stringBuilder.AppendFormat("BPM".PadRight(20));
+
+            }
+            else
+            {
+                stringBuilder.AppendFormat(idx.ToString().PadRight(20));
+                stringBuilder.AppendFormat(time.ToString(CultureInfo.InvariantCulture).PadRight(20));
+                stringBuilder.AppendFormat(startSample.ToString().PadRight(20));
+                stringBuilder.AppendFormat(endSample.ToString().PadRight(20));
+
+                if (!flags.isBeat) return stringBuilder.ToString();
+                
+                stringBuilder.AppendFormat(calculatedBeat.delta.ToString(CultureInfo.InvariantCulture).PadRight(20));
+                stringBuilder.AppendFormat(calculatedBeat.rawBPM.ToString(CultureInfo.InvariantCulture).PadRight(20));
+                stringBuilder.AppendFormat(calculatedBeat.bpm.ToString(CultureInfo.InvariantCulture).PadRight(20));
+            }
+            
+            
+            return stringBuilder.ToString();
+            
+        }
+    } 
 
 
-    private class SongData
+    public class SongData
     {
         public float[] samples;
         public List<PointData> points;
         public PointData currentPoint;
-        
+        public float bpm;
+
     }
-    private struct childObjects
+    private struct ChildObjects
     {
         public GameObject bottom;
         public GameObject start;
         public LineRenderer line;
+        public LineRenderer simpleLine;
         public GameObject cursor;
         public Camera cam;
+        public GameObject quadHolder;
         
     }
+
+    public struct FlagData
+    {
+        public bool simplePoint;
+        public bool isBeat;
+    }
+
+    public struct BeatData
+    {
+        //this is the time between two beats
+        public float delta;
+        
+        //the raw floating point bpm
+        public float rawBPM;
+        
+        //the real usable bpm
+        public float bpm;
+    }
+    
+    
     #endregion
 
 
@@ -51,6 +117,8 @@ public class Song : MonoBehaviour
 
     //extraplotates the sample size (which is by default, -1 to 1 )
     public float meterScale = 100;
+    
+    public float tolerance = 20;
 
     [SerializeField] private float cameraZoomFactor = 1;
 
@@ -58,10 +126,15 @@ public class Song : MonoBehaviour
 
     private SongData songData;
 
-    private childObjects children;
+    private ChildObjects children;
 
     private bool songPaused = false;
-    
+
+    //controls the high end 
+    public float quantizeValueHigh = 160;
+    //controls the low end
+    public float quantizeValueLow = 100;
+
     
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -77,10 +150,20 @@ public class Song : MonoBehaviour
         children.line = ReturnChild("line", children.start.transform).GetComponent<LineRenderer>();
         children.cursor = ReturnChild("cursor", children.start.transform);
         children.cam = ReturnChild("main camera", children.cursor.transform).GetComponent<Camera>();
+        children.simpleLine = ReturnChild("simpleline", children.start.transform).GetComponent<LineRenderer>();
+        children.quadHolder = ReturnChild("quadholder", children.start.transform);
         
         
         GenerateDataPointList();
         DrawSongGraph();
+        
+        GenerateSimpleLine();
+        
+        BeatFind();
+        
+        DebugDataWrite();
+        
+      
      
     }
 
@@ -214,6 +297,185 @@ public class Song : MonoBehaviour
             }
         }
     }
+
+
+    void DebugDataWrite()
+    {
+        string path = "Assets/Debug.txt";
+
+        StreamWriter sw = new StreamWriter(path, false);
+        
+        sw.WriteLine("Song:" );
+        sw.WriteLine($"\tsamples={source.clip.samples}");
+        sw.WriteLine($"\tchannels={source.clip.channels}");
+        sw.WriteLine($"\tBPM={songData.bpm}");
+        
+        sw.WriteLine($"\tpoints={songData.points.Count}");
+      
+
+
+        
+        //write beat points data instead of full dats
+
+        sw.WriteLine(songData.points[0].StringConvert(true));
+        foreach (var beat in songData.points.Where(x => x.flags.isBeat == true).ToList())
+        {
+            sw.WriteLine(beat.StringConvert(false));
+        }
+        
+        
+        
+        
+        // //write header
+        // sw.WriteLine(songData.points[0].StringConvert(true));
+        //   
+        // foreach (var point in songData.points)
+        // {
+        //     sw.WriteLine(point.StringConvert(false));
+        // }
+        //
+        
+        sw.Close();
+        UnityEditor.AssetDatabase.ImportAsset(path);
+        
+        
+    }
+
+
+    void GenerateSimpleLine()
+    {
+        List<int> pointsToKeep = new List<int>();
+        //this returns the indexes of the points to keep on a simplified line
+        LineUtility.Simplify(songData.points.Select(x => x.pointPosition).ToList(), tolerance, pointsToKeep);
+
+        foreach (var id in pointsToKeep)
+        {
+            songData.points[id].flags.simplePoint = true;
+        }
+
+        children.simpleLine.positionCount = pointsToKeep.Count;
+        //This lambda expression selects all the points that are part of the simple line and then gets their positions
+        children.simpleLine.SetPositions(songData.points.Where(x => x.flags.simplePoint == true).Select(X => X.pointPosition).ToArray());
+
+    }
+
+
+    void BeatFind()
+    {
+        List<PointData> simplePoints = songData.points.Where(x => x.flags.simplePoint == true).ToList();
+
+        for (int i = 0; i < simplePoints.Count; i++)
+        {
+            //sets up the first beat position
+            if (i == 0)
+            {
+                if (simplePoints[i].avgSampleValue > simplePoints[i + 1].avgSampleValue)
+                {
+                    simplePoints[i].flags.isBeat = true;
+                }
+            }
+            //checks to see if last position is a beat
+            else if (i == simplePoints.Count - 1)
+            {
+                if (simplePoints[i].avgSampleValue > simplePoints[i - 1].avgSampleValue)
+                {
+                    simplePoints[i].flags.isBeat = true;
+                }
+            }
+            else
+            {
+                //calculates if all middle points are beats
+                if (simplePoints[i - 1].avgSampleValue < simplePoints[i].avgSampleValue && simplePoints[i].avgSampleValue > simplePoints[i + 1].avgSampleValue )
+                {
+                    simplePoints[i].flags.isBeat = true;
+                }
+            }
+        }
+
+        //once all the beats have been found, instantiate markers there
+        List<PointData> beats = simplePoints.Where(x => x.flags.isBeat == true).ToList();
+        
+        foreach (var beat in beats)
+        {
+            if (beat.marker == null)
+            {
+                beat.marker = CreateDebugBeatVisualiser(beat.pointPositionStrait, Color.black, "beat " + beat.idx);
+            }
+        }
+        
+        CalculateBPM(beats);
+    }
+
+
+    private void CalculateBPM(List<PointData> beatList)
+    {
+        for (int i = 1; i < beatList.Count; i++)
+        {
+        
+            //calculates the bpm between the current and last beats 
+            
+            //calculates the time between the last beat
+            beatList[i].calculatedBeat.delta = beatList[i].time - beatList[i - 1].time;
+            beatList[i].calculatedBeat.rawBPM = 60f / beatList[i].calculatedBeat.delta;
+            beatList[i].calculatedBeat.bpm = QuantizeBPM(beatList[i].calculatedBeat.rawBPM);
+            print(beatList[i].calculatedBeat.rawBPM);
+            
+        }
+        
+        //set the final BPM of the average BPM across the whole track
+        print( "average: " + beatList.Average(x => x.calculatedBeat.bpm));
+        songData.bpm = beatList.Average(x => x.calculatedBeat.bpm);
+    }
+    
+    GameObject CreateDebugBeatVisualiser(Vector3 position, Color col, string quadName)
+    {
+        GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+
+        quad.transform.parent = children.quadHolder.transform;
+
+        quad.transform.localPosition = position;
+        quad.transform.localScale = new Vector3(1, 50, 1);
+        Material mat = new Material(Shader.Find("Unlit/Color"));
+        mat.color = col;
+
+        quad.GetComponent<Renderer>().material = mat;
+
+        quad.name = quadName;
+        
+        return  quad;
+
+
+    }
+
+    private float QuantizeBPM(float bpm)
+    {
+        
+        if (bpm > quantizeValueHigh)
+        {
+            while (bpm > quantizeValueHigh)
+            {
+                
+                bpm *= 0.5f;
+            }
+            
+            print("RAISED");
+
+      
+        }
+        else if (bpm < quantizeValueLow)
+        {
+            while (bpm < quantizeValueLow)
+            {
+                bpm *= 2f;
+            }
+            print("LOWERED");
+
+           
+        }
+
+        return bpm;
+    }
+    
     
 
     
