@@ -203,9 +203,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   samplesPerPoint: 1024
   meterScale: 200
-  tolerance: 6
+  tolerance: 4.82
   cameraZoomFactor: 1
-  marker: {fileID: 0}
+  quantizeValueHigh: 160
+  quantizeValueLow: 100
 --- !u!82 &188428254
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1153,5 +1154,5 @@ MeshFilter:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1109558234}
   - {fileID: 188428252}
+  - {fileID: 1109558234}

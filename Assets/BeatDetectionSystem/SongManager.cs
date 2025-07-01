@@ -5,11 +5,9 @@ using UnityEngine;
 using System.Linq;
 using System.IO;
 using System.Text;
-using NUnit.Framework;
-using UnityEngine.Serialization;
 
 [RequireComponent(typeof(AudioSource))]
-public class Song : MonoBehaviour
+public class SongManager : MonoBehaviour
 {
     #region  -- Helper Functions ---
 
@@ -111,7 +109,7 @@ public class Song : MonoBehaviour
     
     #endregion
 
-
+    
     //How many samples to average across per point
     public int samplesPerPoint = 1024;
 
@@ -119,51 +117,41 @@ public class Song : MonoBehaviour
     public float meterScale = 100;
     
     public float tolerance = 20;
+    
+    public SongData songData;
 
     [SerializeField] private float cameraZoomFactor = 1;
 
-    private AudioSource source = null;
+public AudioSource source = null;
 
-    private SongData songData;
+   
 
     private ChildObjects children;
 
-    private bool songPaused = false;
+    public bool songPaused = false;
 
     //controls the high end 
     public float quantizeValueHigh = 140;
     //controls the low end
     public float quantizeValueLow = 80;
-
     
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+
+
+    void Awake()
     {
         songData = new SongData();
         source = GetComponent<AudioSource>();
        
         source.Play();
         
-        //get the children required for the debug visualiser
-        children.bottom = ReturnChild("bottom", transform);
-        children.start = ReturnChild("start", transform);
-        children.line = ReturnChild("line", children.start.transform).GetComponent<LineRenderer>();
-        children.cursor = ReturnChild("cursor", children.start.transform);
-        children.cam = ReturnChild("main camera", children.cursor.transform).GetComponent<Camera>();
-        children.simpleLine = ReturnChild("simpleline", children.start.transform).GetComponent<LineRenderer>();
-        children.quadHolder = ReturnChild("quadholder", children.start.transform);
-        
         
         GenerateDataPointList();
-        DrawSongGraph();
-        
         GenerateSimpleLine();
         
         BeatFind();
         
         DebugDataWrite();
         
-      
      
     }
 
@@ -171,9 +159,7 @@ public class Song : MonoBehaviour
     {
         float timeSample = source.timeSamples * source.clip.channels;
         songData.currentPoint = songData.points.Single(x => x.startSample <= timeSample && x.endSample > timeSample);
-        children.cursor.transform.localPosition = songData.currentPoint.pointPosition;
-
-        DebugInputs();
+//        children.cursor.transform.localPosition = songData.currentPoint.pointPosition;
     }
 
     private void GenerateDataPointList()
@@ -353,9 +339,10 @@ public class Song : MonoBehaviour
             songData.points[id].flags.simplePoint = true;
         }
 
-        children.simpleLine.positionCount = pointsToKeep.Count;
+        //DEBUG CODE FOR DRAWING SIMPLE LINE
+        //children.simpleLine.positionCount = pointsToKeep.Count;
         //This lambda expression selects all the points that are part of the simple line and then gets their positions
-        children.simpleLine.SetPositions(songData.points.Where(x => x.flags.simplePoint == true).Select(X => X.pointPosition).ToArray());
+        //children.simpleLine.SetPositions(songData.points.Where(x => x.flags.simplePoint == true).Select(X => X.pointPosition).ToArray());
 
     }
 
@@ -393,16 +380,16 @@ public class Song : MonoBehaviour
         }
 
         //once all the beats have been found, instantiate markers there
-        List<PointData> beats = simplePoints.Where(x => x.flags.isBeat == true).ToList();
-        
-        foreach (var beat in beats)
-        {
-            if (beat.marker == null)
-            {
-                beat.marker = CreateDebugBeatVisualiser(beat.pointPositionStrait, Color.black, "beat " + beat.idx);
-            }
-        }
-        
+         List<PointData> beats = simplePoints.Where(x => x.flags.isBeat == true).ToList();
+        //
+        // foreach (var beat in beats)
+        // {
+        //     if (beat.marker == null)
+        //     {
+        //         beat.marker = CreateDebugBeatVisualiser(beat.pointPositionStrait, Color.black, "beat " + beat.idx);
+        //     }
+        // }
+        //
         CalculateBPM(beats);
     }
 
