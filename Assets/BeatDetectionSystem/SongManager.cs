@@ -146,11 +146,11 @@ public AudioSource source = null;
         
         
         GenerateDataPointList();
-        GenerateSimpleLine();
+        //GenerateSimpleLine();
         
-        BeatFind();
+        //BeatFind();
         
-        DebugDataWrite();
+       // DebugDataWrite();
         
      
     }

@@ -13,20 +13,22 @@ public class TestBallBehavior : MonoBehaviour
     void Start()
     {
         rigid = GetComponent<Rigidbody>();
-        rigid.AddForce(-Vector3.forward * force);
+       
         manager = FindAnyObjectByType<GameManager>();
+        
+        rigid.AddForce(-Vector3.forward * 175);
     }
 
     // Update is called once per frame
     void Update()
     {
-        
+        rigid.AddForce(-Vector3.forward * force);
     }
 
     private void OnCollisionEnter(Collision other)
     {
-        var localVelocity = transform.InverseTransformDirection(rigid.linearVelocity);
-        print(localVelocity);
+        //var localVelocity = transform.InverseTransformDirection(rigid.linearVelocity);
+       // print(localVelocity);
        
         
        // rigid.AddForce(transform.InverseTransformDirection(-rigid.linearVelocity));
